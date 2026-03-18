@@ -593,9 +593,7 @@ class BaseClient(BaseConnection, AdminAPI):
             raise ValueError("Fork database is not enabled (requires seekdb >= 1.2.0)")
 
         effective_tenant = self._database_tenant(tenant)
-        logger.debug(
-            f"Forking database: {source_name} -> {destination_name}{self._database_context(effective_tenant)}"
-        )
+        logger.debug(f"Forking database: {source_name} -> {destination_name}{self._database_context(effective_tenant)}")
         sql = f"FORK DATABASE `{source_name}` TO `{destination_name}`"
         self._execute(sql)
         logger.debug(f"✅ Successfully forked database '{source_name}' to '{destination_name}'")

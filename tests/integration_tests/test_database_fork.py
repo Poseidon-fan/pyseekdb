@@ -16,8 +16,6 @@ import time
 
 import pytest
 
-import pyseekdb
-
 logger = logging.getLogger(__name__)
 
 
@@ -136,7 +134,7 @@ class TestDatabaseFork:
             admin_client.create_database(source_name)
             admin_client.create_database(dest_name)
 
-            with pytest.raises(Exception):
+            with pytest.raises(ValueError):
                 admin_client.fork_database(source_name, dest_name)
 
         finally:
@@ -164,25 +162,15 @@ class TestDatabaseFork:
         try:
             admin_client.create_database(source_name)
 
-            admin_client._server._execute(
-                f"CREATE TABLE `{source_name}`.`t1` (id INT PRIMARY KEY, val VARCHAR(100))"
-            )
-            admin_client._server._execute(
-                f"INSERT INTO `{source_name}`.`t1` VALUES (1, 'original')"
-            )
+            admin_client._server._execute(f"CREATE TABLE `{source_name}`.`t1` (id INT PRIMARY KEY, val VARCHAR(100))")
+            admin_client._server._execute(f"INSERT INTO `{source_name}`.`t1` VALUES (1, 'original')")
 
             admin_client.fork_database(source_name, dest_name)
 
-            admin_client._server._execute(
-                f"INSERT INTO `{dest_name}`.`t1` VALUES (2, 'forked_only')"
-            )
+            admin_client._server._execute(f"INSERT INTO `{dest_name}`.`t1` VALUES (2, 'forked_only')")
 
-            source_rows = admin_client._server._execute(
-                f"SELECT COUNT(*) as cnt FROM `{source_name}`.`t1`"
-            )
-            dest_rows = admin_client._server._execute(
-                f"SELECT COUNT(*) as cnt FROM `{dest_name}`.`t1`"
-            )
+            source_rows = admin_client._server._execute(f"SELECT COUNT(*) as cnt FROM `{source_name}`.`t1`")
+            dest_rows = admin_client._server._execute(f"SELECT COUNT(*) as cnt FROM `{dest_name}`.`t1`")
 
             source_count = source_rows[0]["cnt"] if isinstance(source_rows[0], dict) else source_rows[0][0]
             dest_count = dest_rows[0]["cnt"] if isinstance(dest_rows[0], dict) else dest_rows[0][0]
