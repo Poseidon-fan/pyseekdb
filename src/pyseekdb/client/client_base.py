@@ -577,6 +577,30 @@ class BaseClient(BaseConnection, AdminAPI):
         logger.debug(f"✅ Found {len(databases)} databases{self._database_context(effective_tenant)}")
         return databases
 
+    def fork_database(self, source_name: str, destination_name: str, tenant: str = DEFAULT_TENANT) -> Database:
+        """
+        Fork (duplicate) a database to create a new independent copy.
+
+        Args:
+            source_name: source database name
+            destination_name: destination database name (must not already exist)
+            tenant: tenant name (for OceanBase)
+
+        Returns:
+            Database object for the newly created destination database
+        """
+        if not self._fork_database_enabled():
+            raise ValueError("Fork database is not enabled (requires seekdb >= 1.2.0)")
+
+        effective_tenant = self._database_tenant(tenant)
+        logger.debug(
+            f"Forking database: {source_name} -> {destination_name}{self._database_context(effective_tenant)}"
+        )
+        sql = f"FORK DATABASE `{source_name}` TO `{destination_name}`"
+        self._execute(sql)
+        logger.debug(f"✅ Successfully forked database '{source_name}' to '{destination_name}'")
+        return self.get_database(destination_name, tenant=tenant)
+
     # ==================== Collection Management (User-facing) ====================
 
     def _prepare_schema_parameters(  # noqa: C901
@@ -1460,11 +1484,17 @@ class BaseClient(BaseConnection, AdminAPI):
             return CollectionNames.table_name_v2(collection_id)
         return CollectionNames.table_name(collection_name)
 
-    def _fork_enabled(self) -> bool:
+    def _fork_table_enabled(self) -> bool:
         db_type, version = self.detect_db_type_and_version()
         version_110 = Version("1.1.0.0")
         logger.debug(f"db_type: {db_type}, version: {version}")
         return db_type.lower() == "seekdb" and version >= version_110
+
+    def _fork_database_enabled(self) -> bool:
+        db_type, version = self.detect_db_type_and_version()
+        version_120 = Version("1.2.0.0")
+        logger.debug(f"db_type: {db_type}, version: {version}")
+        return db_type.lower() == "seekdb" and version >= version_120
 
     def _get_collection_id(self, collection_name: str) -> str:
         collection_id_query_sql = f"SELECT COLLECTION_ID FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name}'"
@@ -1487,7 +1517,7 @@ class BaseClient(BaseConnection, AdminAPI):
             collection: Collection to fork
             forked_name: Forked collection name
         """
-        if not self._fork_enabled():
+        if not self._fork_table_enabled():
             raise ValueError("Fork is not enabled for this database")
 
         _validate_collection_name(forked_name)

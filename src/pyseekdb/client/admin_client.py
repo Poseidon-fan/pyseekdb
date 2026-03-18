@@ -88,6 +88,29 @@ class AdminAPI(ABC):
         """
         pass
 
+    @abstractmethod
+    def fork_database(self, source_name: str, destination_name: str, tenant: str = DEFAULT_TENANT) -> Database:
+        """
+        Fork (duplicate) a database to create a new independent copy.
+
+        The destination database is logically equivalent to the source database at the
+        fork snapshot moment, containing all user tables and their data. It can be used
+        as an independent database for subsequent read/write operations.
+
+        Args:
+            source_name: source database name
+            destination_name: destination database name (must not already exist)
+            tenant: tenant name (for OceanBase)
+
+        Returns:
+            Database object for the newly created destination database
+
+        Raises:
+            ValueError: If fork is not supported (requires seekdb >= 1.2.0),
+                        or if the destination database already exists.
+        """
+        pass
+
 
 class _AdminClientProxy(AdminAPI):
     """
@@ -128,6 +151,10 @@ class _AdminClientProxy(AdminAPI):
     ) -> Sequence[Database]:
         """Proxy to server implementation"""
         return self._server.list_databases(limit=limit, offset=offset, tenant=tenant)
+
+    def fork_database(self, source_name: str, destination_name: str, tenant: str = DEFAULT_TENANT) -> Database:
+        """Proxy to server implementation"""
+        return self._server.fork_database(source_name=source_name, destination_name=destination_name, tenant=tenant)
 
     def __repr__(self):
         return f"<AdminClient server={self._server}>"
