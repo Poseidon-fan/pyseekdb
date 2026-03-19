@@ -23,10 +23,10 @@ logger = logging.getLogger(__name__)
 class TestCollectionFork:
     """Tests for collection.fork() method using real database connections."""
 
-    def _is_fork_enabled(self, client) -> bool:
+    def _is_fork_table_enabled(self, client) -> bool:
         """Check if fork is enabled for the given client."""
         try:
-            return client._server._fork_enabled()
+            return client._server._fork_table_enabled()
         except Exception:
             logger.exception("Failed to check if fork is enabled")
             return False
@@ -39,7 +39,7 @@ class TestCollectionFork:
         Skips if fork is not enabled for the database.
         """
         # Check if fork is enabled
-        if not self._is_fork_enabled(db_client):
+        if not self._is_fork_table_enabled(db_client):
             pytest.skip("Fork is not enabled for this database")
 
         # Create test collection
@@ -101,7 +101,7 @@ class TestCollectionFork:
         Skips if fork is not enabled for the database.
         """
         # Check if fork is enabled
-        if not self._is_fork_enabled(db_client):
+        if not self._is_fork_table_enabled(db_client):
             pytest.skip("Fork is not enabled for this database")
 
         # Create test collection
@@ -130,7 +130,7 @@ class TestCollectionFork:
         Skips if fork is not enabled for the database.
         """
         # Check if fork is enabled
-        if not self._is_fork_enabled(db_client):
+        if not self._is_fork_table_enabled(db_client):
             pytest.skip("Fork is not enabled for this database")
 
         # Create test collection
@@ -159,7 +159,7 @@ class TestCollectionFork:
         Skips if fork is not enabled for the database.
         """
         # Check if fork is enabled
-        if not self._is_fork_enabled(db_client):
+        if not self._is_fork_table_enabled(db_client):
             pytest.skip("Fork is not enabled for this database")
 
         # Create test collection
@@ -214,7 +214,7 @@ class TestCollectionFork:
         Skips if fork is not enabled for the database.
         """
         # Check if fork is enabled
-        if not self._is_fork_enabled(db_client):
+        if not self._is_fork_table_enabled(db_client):
             pytest.skip("Fork is not enabled for this database")
 
         # Create test collection
@@ -278,7 +278,7 @@ class TestCollectionFork:
         Skips if fork is not enabled for the database.
         """
         # Check if fork is enabled
-        if not self._is_fork_enabled(db_client):
+        if not self._is_fork_table_enabled(db_client):
             pytest.skip("Fork is not enabled for this database")
 
         # Create v1 test collection
@@ -350,7 +350,7 @@ class TestCollectionFork:
         Skips if fork is not enabled for the database.
         """
         # Check if fork is enabled
-        if not self._is_fork_enabled(db_client):
+        if not self._is_fork_table_enabled(db_client):
             pytest.skip("Fork is not enabled for this database")
 
         # Create v1 test collection
@@ -412,7 +412,7 @@ class TestCollectionFork:
         Skips if fork is not enabled for the database.
         """
         # Check if fork is enabled
-        if not self._is_fork_enabled(db_client):
+        if not self._is_fork_table_enabled(db_client):
             pytest.skip("Fork is not enabled for this database")
 
         # Create v1 test collection
@@ -494,7 +494,7 @@ class TestCollectionFork:
         Skips if fork is not enabled for the database.
         """
         # Check if fork is enabled
-        if not self._is_fork_enabled(db_client):
+        if not self._is_fork_table_enabled(db_client):
             pytest.skip("Fork is not enabled for this database")
 
         # Create both v1 and v2 collections
