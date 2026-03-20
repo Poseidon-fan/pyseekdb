@@ -180,8 +180,9 @@ class Collection:
 
         Note:
             - Diff is only available for seekdb database version 1.2.0.0 or higher.
-            - In the SQL semantics, ``self`` is the "incoming" table and ``other`` is
-              the "current" (baseline) table.
+            - Collections created via the standard SDK path (using ``create_collection()``)
+            are not supported, as seekdb does not support DIFF/MERGE TABLE on LOB column
+            types (``document``, ``embedding``, ``metadata``). Use plain non-LOB schemas instead.
 
         Examples:
         .. code-block:: python
@@ -226,6 +227,9 @@ class Collection:
             - The merge executes in a single transaction; on failure it rolls back entirely.
             - In the SQL semantics, ``self`` is the "incoming" table and ``target`` is
               the "current" table.
+            - Collections created via the standard SDK path (using ``create_collection()``)
+            are not supported, as seekdb does not support DIFF/MERGE TABLE on LOB column
+            types (``document``, ``embedding``, ``metadata``). Use plain non-LOB schemas instead.
 
         Examples:
         .. code-block:: python
