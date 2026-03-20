@@ -1563,7 +1563,20 @@ class BaseClient(BaseConnection, AdminAPI):
 
     _VALID_MERGE_STRATEGIES: ClassVar[set[str]] = {"FAIL", "THEIRS", "OURS"}
 
-    def _collection_diff(self, incoming: Collection, current: Collection) -> list:
+    def _validate_same_client(self, incoming: Collection, current: Collection) -> None:
+        """Ensure both collections belong to this client."""
+        if incoming.client is not self:
+            raise ValueError(
+                f"Collection '{incoming.name}' belongs to a different client; "
+                "diff/merge requires both collections to be from the same client"
+            )
+        if current.client is not self:
+            raise ValueError(
+                f"Collection '{current.name}' belongs to a different client; "
+                "diff/merge requires both collections to be from the same client"
+            )
+
+    def _collection_diff(self, incoming: Collection, current: Collection) -> list[dict[str, Any]]:
         """
         Diff two collections, returning rows that differ between them.
 
@@ -1572,21 +1585,26 @@ class BaseClient(BaseConnection, AdminAPI):
             current: The current (baseline) collection
 
         Returns:
-            List of diff result rows. Empty list if no differences.
+            List of normalized diff result dicts. Empty list if no differences.
         """
         if not self._diff_merge_enabled():
             raise ValueError("Diff is not enabled for this database (requires seekdb >= 1.2.0)")
+
+        self._validate_same_client(incoming, current)
 
         incoming_table = self._get_collection_table_name(incoming.id, incoming.name)
         current_table = self._get_collection_table_name(current.id, current.name)
 
         diff_sql = f"DIFF TABLE `{incoming_table}` AGAINST `{current_table}`"
-        result = self._execute(diff_sql)
+        conn = self._ensure_connection()
+        result = self._execute_query_with_cursor(
+            conn, diff_sql, params=[], use_context_manager=self._use_context_manager_for_cursor()
+        )
         logger.debug(
             f"✅ Successfully diffed collection '{incoming.name}' against '{current.name}', "
-            f"found {len(result) if result else 0} diff rows"
+            f"found {len(result)} diff rows"
         )
-        return result if result else []
+        return result
 
     def _collection_merge(self, incoming: Collection, current: Collection, strategy: str = "FAIL") -> None:
         """
@@ -1605,6 +1623,8 @@ class BaseClient(BaseConnection, AdminAPI):
             raise ValueError(
                 f"Invalid merge strategy: '{strategy}'. Must be one of: {', '.join(sorted(self._VALID_MERGE_STRATEGIES))}"
             )
+
+        self._validate_same_client(incoming, current)
 
         incoming_table = self._get_collection_table_name(incoming.id, incoming.name)
         current_table = self._get_collection_table_name(current.id, current.name)
