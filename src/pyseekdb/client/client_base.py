@@ -11,7 +11,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from pymysql.converters import escape_string
 
@@ -1494,6 +1494,12 @@ class BaseClient(BaseConnection, AdminAPI):
         logger.debug(f"db_type: {db_type}, version: {version}")
         return db_type.lower() == "seekdb" and version >= version_120
 
+    def _diff_merge_enabled(self) -> bool:
+        db_type, version = self.detect_db_type_and_version()
+        version_120 = Version("1.2.0.0")
+        logger.debug(f"db_type: {db_type}, version: {version}")
+        return db_type.lower() == "seekdb" and version >= version_120
+
     def _get_collection_id(self, collection_name: str) -> str:
         collection_id_query_sql = f"SELECT COLLECTION_ID FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name}'"
         collection_id_query_result = self._execute(collection_id_query_sql)
@@ -1554,6 +1560,60 @@ class BaseClient(BaseConnection, AdminAPI):
 
             raise ValueError(f"Failed to fork collection: {ex}") from ex
         logger.debug(f"✅ Successfully forked collection '{collection.name}' to '{forked_name}'")
+
+    _VALID_MERGE_STRATEGIES: ClassVar[set[str]] = {"FAIL", "THEIRS", "OURS"}
+
+    def _collection_diff(self, incoming: Collection, current: Collection) -> list:
+        """
+        Diff two collections, returning rows that differ between them.
+
+        Args:
+            incoming: The incoming (comparison) collection
+            current: The current (baseline) collection
+
+        Returns:
+            List of diff result rows. Empty list if no differences.
+        """
+        if not self._diff_merge_enabled():
+            raise ValueError("Diff is not enabled for this database (requires seekdb >= 1.2.0)")
+
+        incoming_table = self._get_collection_table_name(incoming.id, incoming.name)
+        current_table = self._get_collection_table_name(current.id, current.name)
+
+        diff_sql = f"DIFF TABLE `{incoming_table}` AGAINST `{current_table}`"
+        result = self._execute(diff_sql)
+        logger.debug(
+            f"✅ Successfully diffed collection '{incoming.name}' against '{current.name}', "
+            f"found {len(result) if result else 0} diff rows"
+        )
+        return result if result else []
+
+    def _collection_merge(self, incoming: Collection, current: Collection, strategy: str = "FAIL") -> None:
+        """
+        Merge incoming collection into current collection.
+
+        Args:
+            incoming: The incoming (source) collection
+            current: The current (target) collection
+            strategy: Conflict resolution strategy - FAIL, THEIRS, or OURS (default: FAIL)
+        """
+        if not self._diff_merge_enabled():
+            raise ValueError("Merge is not enabled for this database (requires seekdb >= 1.2.0)")
+
+        strategy_upper = strategy.upper()
+        if strategy_upper not in self._VALID_MERGE_STRATEGIES:
+            raise ValueError(
+                f"Invalid merge strategy: '{strategy}'. Must be one of: {', '.join(sorted(self._VALID_MERGE_STRATEGIES))}"
+            )
+
+        incoming_table = self._get_collection_table_name(incoming.id, incoming.name)
+        current_table = self._get_collection_table_name(current.id, current.name)
+
+        merge_sql = f"MERGE TABLE `{incoming_table}` INTO `{current_table}` STRATEGY {strategy_upper}"
+        self._execute(merge_sql)
+        logger.debug(
+            f"✅ Successfully merged collection '{incoming.name}' into '{current.name}' with strategy {strategy_upper}"
+        )
 
     # ==================== Collection Internal Operations (Called by Collection) ====================
     # These methods are called by Collection objects, different clients implement different logic

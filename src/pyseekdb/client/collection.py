@@ -155,6 +155,92 @@ class Collection:
         collection = self._client.get_collection(forked_name, embedding_function=self._embedding_function)
         return collection
 
+    def diff(self, other: "Collection") -> list[dict[str, Any]]:
+        """
+        Diff this collection against another collection (baseline).
+
+        Compares rows by primary key. Returns rows that differ between the two collections:
+        conflicting rows (same key, different values), and rows unique to either collection.
+        Rows that are identical in both collections are not included.
+
+        This is a read-only operation - neither collection is modified.
+
+        Args:
+            other: The baseline collection to compare against. Must have the same
+                   column definitions (column names, types, and order) and a primary key.
+
+        Returns:
+            list[dict[str, Any]]: List of diff result rows. Each row is a dict containing
+                the table columns plus system columns indicating the source table and diff type.
+                Returns an empty list if the collections are identical.
+
+        Raises:
+            ValueError: If diff is not enabled (requires seekdb >= 1.2.0),
+                       or if the two collections have incompatible schemas.
+
+        Note:
+            - Diff is only available for seekdb database version 1.2.0.0 or higher.
+            - In the SQL semantics, ``self`` is the "incoming" table and ``other`` is
+              the "current" (baseline) table.
+
+        Examples:
+        .. code-block:: python
+            original = client.get_collection("baseline")
+            modified = original.fork("modified_copy")
+
+            # Make changes to modified copy
+            modified.add(ids="new_id", embeddings=[1.0, 2.0, 3.0], documents="New doc")
+
+            # See what changed
+            diff_rows = modified.diff(original)
+            for row in diff_rows:
+                print(row)
+
+        """
+        return self._client._collection_diff(incoming=self, current=other)
+
+    def merge_into(self, target: "Collection", strategy: str = "FAIL") -> None:
+        """
+        Merge this collection's changes into the target collection.
+
+        Non-conflicting rows (rows unique to this collection) are inserted into the target.
+        Rows unique to the target are preserved. Conflicting rows (same primary key,
+        different values) are handled according to the specified strategy.
+        Merge does not delete any rows from the target.
+
+        Args:
+            target: The target collection to merge into. Must have the same
+                    column definitions (column names, types, and order) and a primary key.
+            strategy: Conflict resolution strategy. One of:
+                - ``"FAIL"`` (default): Raise an error and roll back if any conflicts exist.
+                - ``"THEIRS"``: Use this collection's values to overwrite the target on conflict.
+                - ``"OURS"``: Keep the target's values unchanged on conflict.
+
+        Raises:
+            ValueError: If merge is not enabled (requires seekdb >= 1.2.0),
+                       if the strategy is invalid, or if the two collections have
+                       incompatible schemas.
+
+        Note:
+            - Merge is only available for seekdb database version 1.2.0.0 or higher.
+            - The merge executes in a single transaction; on failure it rolls back entirely.
+            - In the SQL semantics, ``self`` is the "incoming" table and ``target`` is
+              the "current" table.
+
+        Examples:
+        .. code-block:: python
+            original = client.get_collection("main_data")
+            branch = original.fork("experiment")
+
+            # Make changes in the branch
+            branch.add(ids="new_id", embeddings=[1.0, 2.0, 3.0], documents="New doc")
+
+            # Merge branch changes back, using branch values on conflict
+            branch.merge_into(original, strategy="THEIRS")
+
+        """
+        self._client._collection_merge(incoming=self, current=target, strategy=strategy)
+
     # ==================== DML Operations ====================
     # All methods delegate to client's internal implementation
 
